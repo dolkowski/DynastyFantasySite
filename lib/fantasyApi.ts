@@ -1,43 +1,103 @@
 import { mockLeagueData } from '@/data/mockLeagueData';
+import {
+  buildLeagueTeams,
+  buildStandings,
+  buildWeeklyMatchups,
+  getLeague,
+  getLeagueMatchups,
+  getLeagueRosters,
+  getLeagueUsers,
+  getNFLState,
+  SLEEPER_LEAGUE_ID
+} from '@/lib/sleeper';
 import { LeagueSnapshot, TeamProfile } from '@/lib/types';
 
-const API_BASE_URL = process.env.FANTASY_API_BASE_URL;
-const API_KEY = process.env.FANTASY_API_KEY;
+function mapToSnapshotFallback(): LeagueSnapshot {
+  return mockLeagueData;
+}
 
-async function fetchFromProvider<T>(path: string): Promise<T | null> {
-  if (!API_BASE_URL || !API_KEY) {
-    return null;
-  }
+async function getSleeperSnapshot(): Promise<LeagueSnapshot> {
+  const [league, nflState, users, rosters] = await Promise.all([
+    getLeague(SLEEPER_LEAGUE_ID),
+    getNFLState(),
+    getLeagueUsers(SLEEPER_LEAGUE_ID),
+    getLeagueRosters(SLEEPER_LEAGUE_ID)
+  ]);
 
-  try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      next: { revalidate: 300 }
-    });
+  const currentWeek = nflState.week;
+  const rawMatchups = await getLeagueMatchups(SLEEPER_LEAGUE_ID, currentWeek);
 
-    if (!response.ok) {
-      return null;
-    }
+  const teams = buildLeagueTeams(users, rosters);
+  const standings = buildStandings(teams);
+  const weeklyMatchups = buildWeeklyMatchups(rawMatchups, teams);
 
-    return (await response.json()) as T;
-  } catch {
-    return null;
-  }
+  return {
+    summary: {
+      leagueName: league.name,
+      season: Number(league.season),
+      currentWeek,
+      totalTeams: league.total_rosters,
+      headline: `Live update for week ${currentWeek} in ${league.name}.`
+    },
+    currentWeek,
+    standings: standings.map((team) => ({
+      id: String(team.rosterId),
+      name: team.teamName,
+      manager: team.displayName,
+      wins: team.wins,
+      losses: team.losses,
+      pointsFor: team.pointsFor,
+      pointsAgainst: team.pointsAgainst,
+      streak: team.ties > 0 ? `T${team.ties}` : '-'
+    })),
+    weeklyMatchups: weeklyMatchups
+      .filter((matchup) => matchup.teams.length === 2)
+      .map((matchup) => ({
+        id: String(matchup.matchupId),
+        homeTeamId: String(matchup.teams[1].rosterId),
+        awayTeamId: String(matchup.teams[0].rosterId),
+        homeTeamName: matchup.teams[1].teamName,
+        awayTeamName: matchup.teams[0].teamName,
+        homeProjection: matchup.teams[1].pointsFor,
+        awayProjection: matchup.teams[0].pointsFor,
+        kickoffLabel: `Week ${currentWeek}`
+      })),
+    powerRankings: standings.map((team, index) => ({
+      rank: index + 1,
+      teamId: String(team.rosterId),
+      teamName: team.teamName,
+      trend: 'steady' as const,
+      note: `${team.wins}-${team.losses}${team.ties ? `-${team.ties}` : ''} record with ${team.pointsFor.toFixed(2)} PF.`
+    })),
+    teamProfiles: standings.map((team) => ({
+      id: String(team.rosterId),
+      name: team.teamName,
+      manager: team.displayName,
+      wins: team.wins,
+      losses: team.losses,
+      pointsFor: team.pointsFor,
+      pointsAgainst: team.pointsAgainst,
+      streak: team.ties > 0 ? `T${team.ties}` : '-',
+      division: 'Sleeper League',
+      rosterHighlights: [
+        `${team.starterPlayerIds.length} starters configured`,
+        `${team.benchPlayerIds.length} bench players`,
+        `${team.allPlayerIds.length} total rostered players`
+      ],
+      nextOpponent: 'TBD'
+    }))
+  };
 }
 
 export async function getLeagueSnapshot(): Promise<LeagueSnapshot> {
-  const remote = await fetchFromProvider<LeagueSnapshot>('/league/snapshot');
-  return remote ?? mockLeagueData;
+  try {
+    return await getSleeperSnapshot();
+  } catch {
+    return mapToSnapshotFallback();
+  }
 }
 
 export async function getTeamById(teamId: string): Promise<TeamProfile | undefined> {
-  const remote = await fetchFromProvider<TeamProfile>(`/teams/${teamId}`);
-  if (remote) {
-    return remote;
-  }
-
-  return mockLeagueData.teamProfiles.find((team) => team.id === teamId);
+  const { teamProfiles } = await getLeagueSnapshot();
+  return teamProfiles.find((team) => team.id === teamId);
 }

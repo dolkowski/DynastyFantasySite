@@ -56,7 +56,7 @@ A production-ready Next.js App Router project for a fantasy football league webs
 
 - File: `lib/sleeper.ts`
 - Types: `types/sleeper.ts`
-- Default league ID constant: `1312605770595995648`
+- Website data pulls from league ID constant: `1312605770595995648`
 
 Available functions:
 
@@ -67,7 +67,9 @@ Available functions:
 - `getLeagueTransactions(leagueId, week)`
 - `getLeagueTradedPicks(leagueId)`
 - `getNFLState()`
-- `normalizeLeagueTeams(users, rosters)`
+- `buildLeagueTeams(users, rosters)`
+- `buildStandings(leagueTeams)`
+- `buildWeeklyMatchups(matchups, leagueTeams)`
 - `getNormalizedLeagueTeams(leagueId)`
 
 ## Project Structure

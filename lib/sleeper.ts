@@ -1,5 +1,6 @@
 import {
-  NormalizedLeagueTeam,
+  LeagueTeam,
+  LeagueWeeklyMatchup,
   SleeperLeague,
   SleeperMatchup,
   SleeperNFLState,
@@ -10,6 +11,7 @@ import {
 } from '@/types/sleeper';
 
 const DEFAULT_BASE_URL = 'https://api.sleeper.app/v1';
+export const SLEEPER_LEAGUE_ID = '1312605770595995648';
 
 export class SleeperApiError extends Error {
   constructor(
@@ -66,6 +68,17 @@ function assertWeek(week: number): void {
   }
 }
 
+function toFantasyPoints(whole?: number, decimal?: number): number {
+  const safeWhole = Number(whole ?? 0);
+  const safeDecimal = String(decimal ?? 0).padStart(2, '0');
+  return Number.parseFloat(`${safeWhole}.${safeDecimal}`);
+}
+
+function resolveTeamName(user?: SleeperUser, roster?: SleeperRoster): string {
+  const metadataTeamName = user?.metadata?.team_name ?? roster?.metadata?.team_name;
+  return metadataTeamName ?? user?.display_name ?? user?.username ?? `Roster ${roster?.roster_id ?? 'Unknown'}`;
+}
+
 export async function getLeague(leagueId: string): Promise<SleeperLeague> {
   assertLeagueId(leagueId);
   return sleeperFetch<SleeperLeague>(`/league/${leagueId}`);
@@ -102,33 +115,73 @@ export async function getNFLState(): Promise<SleeperNFLState> {
   return sleeperFetch<SleeperNFLState>('/state/nfl');
 }
 
-export function normalizeLeagueTeams(users: SleeperUser[], rosters: SleeperRoster[]): NormalizedLeagueTeam[] {
+export function buildLeagueTeams(users: SleeperUser[], rosters: SleeperRoster[]): LeagueTeam[] {
   const userMap = new Map(users.map((user) => [user.user_id, user]));
 
   return rosters.map((roster) => {
     const owner = roster.owner_id ? userMap.get(roster.owner_id) : undefined;
-    const displayName = owner?.display_name ?? owner?.metadata?.team_name ?? `Roster ${roster.roster_id}`;
+    const starterPlayerIds = (roster.starters ?? []).filter(Boolean);
+    const allPlayerIds = (roster.players ?? []).filter(Boolean);
+    const starterSet = new Set(starterPlayerIds);
 
     return {
       rosterId: roster.roster_id,
       ownerId: roster.owner_id,
-      displayName,
+      teamName: resolveTeamName(owner, roster),
+      displayName: owner?.display_name ?? owner?.username ?? `Roster ${roster.roster_id}`,
       username: owner?.username ?? 'Unknown Manager',
       avatar: owner?.avatar ?? null,
       wins: Number(roster.settings?.wins ?? 0),
       losses: Number(roster.settings?.losses ?? 0),
       ties: Number(roster.settings?.ties ?? 0),
-      pointsFor: Number(`${roster.settings?.fpts ?? 0}.${roster.settings?.fpts_decimal ?? 0}`),
-      pointsAgainst: Number(`${roster.settings?.fpts_against ?? 0}.${roster.settings?.fpts_against_decimal ?? 0}`),
-      starters: roster.starters ?? [],
-      players: roster.players ?? []
+      pointsFor: toFantasyPoints(roster.settings?.fpts, roster.settings?.fpts_decimal),
+      pointsAgainst: toFantasyPoints(roster.settings?.fpts_against, roster.settings?.fpts_against_decimal),
+      starterPlayerIds,
+      benchPlayerIds: allPlayerIds.filter((playerId) => !starterSet.has(playerId)),
+      allPlayerIds
     };
   });
 }
 
-export async function getNormalizedLeagueTeams(leagueId: string): Promise<NormalizedLeagueTeam[]> {
-  const [users, rosters] = await Promise.all([getLeagueUsers(leagueId), getLeagueRosters(leagueId)]);
-  return normalizeLeagueTeams(users, rosters);
+export function buildStandings(leagueTeams: LeagueTeam[]): LeagueTeam[] {
+  return [...leagueTeams].sort((a, b) => {
+    if (b.wins !== a.wins) {
+      return b.wins - a.wins;
+    }
+
+    if (b.pointsFor !== a.pointsFor) {
+      return b.pointsFor - a.pointsFor;
+    }
+
+    return a.teamName.localeCompare(b.teamName);
+  });
 }
 
-export const SLEEPER_LEAGUE_ID = '1312605770595995648';
+export function buildWeeklyMatchups(matchups: SleeperMatchup[], leagueTeams: LeagueTeam[]): LeagueWeeklyMatchup[] {
+  const teamByRosterId = new Map(leagueTeams.map((team) => [team.rosterId, team]));
+  const grouped = new Map<number, LeagueTeam[]>();
+
+  for (const matchup of matchups) {
+    const team = teamByRosterId.get(matchup.roster_id);
+    if (!team) {
+      continue;
+    }
+
+    const bucket = grouped.get(matchup.matchup_id) ?? [];
+    bucket.push(team);
+    grouped.set(matchup.matchup_id, bucket);
+  }
+
+  return [...grouped.entries()]
+    .map(([matchupId, teams]) => ({
+      matchupId,
+      teams,
+      isComplete: teams.length === 2
+    }))
+    .sort((a, b) => a.matchupId - b.matchupId);
+}
+
+export async function getNormalizedLeagueTeams(leagueId: string = SLEEPER_LEAGUE_ID): Promise<LeagueTeam[]> {
+  const [users, rosters] = await Promise.all([getLeagueUsers(leagueId), getLeagueRosters(leagueId)]);
+  return buildLeagueTeams(users, rosters);
+}

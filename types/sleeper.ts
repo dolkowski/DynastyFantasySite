@@ -86,9 +86,10 @@ export interface SleeperNFLState {
   display_week: number;
 }
 
-export interface NormalizedLeagueTeam {
+export interface LeagueTeam {
   rosterId: number;
   ownerId: string | null;
+  teamName: string;
   displayName: string;
   username: string;
   avatar: string | null;
@@ -97,6 +98,15 @@ export interface NormalizedLeagueTeam {
   ties: number;
   pointsFor: number;
   pointsAgainst: number;
-  starters: string[];
-  players: string[];
+  starterPlayerIds: string[];
+  benchPlayerIds: string[];
+  allPlayerIds: string[];
 }
+
+export interface LeagueWeeklyMatchup {
+  matchupId: number;
+  teams: LeagueTeam[];
+  isComplete: boolean;
+}
+
+export type NormalizedLeagueTeam = LeagueTeam;
