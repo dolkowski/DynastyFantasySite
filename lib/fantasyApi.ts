@@ -1,11 +1,13 @@
-import { getLeagueId } from '@/lib/config';
+import { mockLeagueData } from '@/data/mockLeagueData';
+import { LEAGUE_ID } from '@/lib/config';
 import {
   buildStandings,
   buildWeeklyMatchups,
   getLeague,
   getLeagueMatchups,
-  getNFLState,
-  getNormalizedLeagueTeams
+  getLeagueRosters,
+  getLeagueUsers,
+  getNFLState
 } from '@/lib/sleeper';
 import { LeagueSnapshot, TeamProfile } from '@/lib/types';
 
@@ -13,14 +15,20 @@ export async function getLeagueSnapshot(): Promise<LeagueSnapshot> {
   const leagueId = getLeagueId();
   console.log('Loading Sleeper League:', leagueId);
 
-  const [league, nflState, teams] = await Promise.all([
-    getLeague(leagueId),
+async function getSleeperSnapshot(): Promise<LeagueSnapshot> {
+  console.log('Loading Sleeper League:', LEAGUE_ID);
+
+  const [league, nflState, users, rosters] = await Promise.all([
+    getLeague(LEAGUE_ID),
     getNFLState(),
-    getNormalizedLeagueTeams(leagueId)
+    getLeagueUsers(LEAGUE_ID),
+    getLeagueRosters(LEAGUE_ID)
   ]);
 
   const currentWeek = nflState.week;
-  const rawMatchups = await getLeagueMatchups(leagueId, currentWeek);
+  const rawMatchups = await getLeagueMatchups(LEAGUE_ID, currentWeek);
+
+  const teams = buildLeagueTeams(users, rosters);
   const standings = buildStandings(teams);
   const weeklyMatchups = buildWeeklyMatchups(rawMatchups, teams);
 

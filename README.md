@@ -57,7 +57,7 @@ A production-ready Next.js App Router project for a fantasy football league webs
 
 - File: `lib/sleeper.ts`
 - Types: `types/sleeper.ts`
-- League ID is read from env via `lib/config.ts#getLeagueId` (`SLEEPER_LEAGUE_ID`, fallback `NEXT_PUBLIC_SLEEPER_LEAGUE_ID`)
+- Website data pulls from `lib/config.ts` constant `LEAGUE_ID`: `1312905624287203328`
 
 Available functions:
 
