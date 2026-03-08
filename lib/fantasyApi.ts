@@ -1,13 +1,11 @@
-import { mockLeagueData } from '@/data/mockLeagueData';
-import { LEAGUE_ID } from '@/lib/config';
+import { getLeagueId } from '@/lib/config';
 import {
   buildStandings,
   buildWeeklyMatchups,
   getLeague,
   getLeagueMatchups,
-  getLeagueRosters,
-  getLeagueUsers,
-  getNFLState
+  getNFLState,
+  getNormalizedLeagueTeams
 } from '@/lib/sleeper';
 import { LeagueSnapshot, TeamProfile } from '@/lib/types';
 
@@ -15,20 +13,14 @@ export async function getLeagueSnapshot(): Promise<LeagueSnapshot> {
   const leagueId = getLeagueId();
   console.log('Loading Sleeper League:', leagueId);
 
-async function getSleeperSnapshot(): Promise<LeagueSnapshot> {
-  console.log('Loading Sleeper League:', LEAGUE_ID);
-
-  const [league, nflState, users, rosters] = await Promise.all([
-    getLeague(LEAGUE_ID),
+  const [league, nflState, teams] = await Promise.all([
+    getLeague(leagueId),
     getNFLState(),
-    getLeagueUsers(LEAGUE_ID),
-    getLeagueRosters(LEAGUE_ID)
+    getNormalizedLeagueTeams(leagueId)
   ]);
 
   const currentWeek = nflState.week;
-  const rawMatchups = await getLeagueMatchups(LEAGUE_ID, currentWeek);
-
-  const teams = buildLeagueTeams(users, rosters);
+  const rawMatchups = await getLeagueMatchups(leagueId, currentWeek);
   const standings = buildStandings(teams);
   const weeklyMatchups = buildWeeklyMatchups(rawMatchups, teams);
 
@@ -65,7 +57,7 @@ async function getSleeperSnapshot(): Promise<LeagueSnapshot> {
       })),
     powerRankings: standings.map((team, index) => ({
       rank: index + 1,
-      teamId: String(team.rosterId),
+      rosterId: String(team.rosterId),
       teamName: team.teamName,
       trend: 'steady' as const,
       note: `${team.wins}-${team.losses}${team.ties ? `-${team.ties}` : ''} record with ${team.pointsFor.toFixed(2)} PF.`
@@ -90,7 +82,7 @@ async function getSleeperSnapshot(): Promise<LeagueSnapshot> {
   };
 }
 
-export async function getTeamById(teamId: string): Promise<TeamProfile | undefined> {
+export async function getTeamByRosterId(rosterId: string): Promise<TeamProfile | undefined> {
   const { teamProfiles } = await getLeagueSnapshot();
-  return teamProfiles.find((team) => team.id === teamId);
+  return teamProfiles.find((team) => team.id === rosterId);
 }

@@ -30,7 +30,7 @@ export type Matchup = {
 
 export type Ranking = {
   rank: number;
-  teamId: string;
+  rosterId: string;
   teamName: string;
   trend: 'up' | 'down' | 'steady';
   note: string;

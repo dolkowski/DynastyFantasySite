@@ -20,12 +20,12 @@ export function PowerRankings({ rankings, showAll = false }: { rankings: Ranking
       </div>
       <ol className="space-y-2">
         {rankings.map((item) => (
-          <li key={item.teamId} className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+          <li key={item.rosterId} className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-semibold text-white">
                   {item.rank}.{' '}
-                  <Link href={`/teams/${item.teamId}`} className="hover:text-accent">
+                  <Link href={`/teams/${item.rosterId}`} className="hover:text-accent">
                     {item.teamName}
                   </Link>
                 </p>

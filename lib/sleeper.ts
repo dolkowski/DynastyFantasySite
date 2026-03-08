@@ -10,7 +10,6 @@ import {
   SleeperTradedPick,
   SleeperUser
 } from '@/types/sleeper';
-import { LEAGUE_ID } from '@/lib/config';
 
 const DEFAULT_BASE_URL = 'https://api.sleeper.app/v1';
 
@@ -103,6 +102,7 @@ function getWinPct(team: LeagueTeam): number {
   return (team.wins + team.ties * 0.5) / totalGames;
 }
 
+// GET /league/{league_id}
 export async function getLeague(leagueId: string): Promise<SleeperLeague> {
   assertLeagueId(leagueId);
   const league = await sleeperFetch<SleeperLeague>(`/league/${leagueId}`);
@@ -268,7 +268,7 @@ export function selectFeaturedMatchup(matchups: LeagueWeeklyMatchup[], standings
   return best;
 }
 
-export async function getNormalizedLeagueTeams(leagueId: string = LEAGUE_ID): Promise<LeagueTeam[]> {
+export async function getNormalizedLeagueTeams(leagueId: string): Promise<LeagueTeam[]> {
   const [users, rosters] = await Promise.all([getLeagueUsers(leagueId), getLeagueRosters(leagueId)]);
   return buildLeagueTeams(users, rosters);
 }

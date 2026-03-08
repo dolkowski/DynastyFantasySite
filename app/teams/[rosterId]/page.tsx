@@ -1,17 +1,11 @@
 import { notFound } from 'next/navigation';
-import { LEAGUE_ID } from '@/lib/config';
-import {
-  buildStandings,
-  getLeagueTransactions,
-  getNFLState,
-  getNormalizedLeagueTeams,
-  SleeperApiError
-} from '@/lib/sleeper';
-import { getLeagueSnapshot } from '@/lib/fantasyApi';
+import { getLeagueId } from '@/lib/config';
+import { buildStandings, getLeagueTransactions, getNFLState, getNormalizedLeagueTeams } from '@/lib/sleeper';
 
 export async function generateStaticParams() {
   try {
-    const teams = await getNormalizedLeagueTeams(LEAGUE_ID);
+    const leagueId = getLeagueId();
+    const teams = await getNormalizedLeagueTeams(leagueId);
     return teams.map((team) => ({ rosterId: String(team.rosterId) }));
   } catch {
     return [];
@@ -20,7 +14,8 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: { rosterId: string } }) {
   try {
-    const teams = await getNormalizedLeagueTeams(LEAGUE_ID);
+    const leagueId = getLeagueId();
+    const teams = await getNormalizedLeagueTeams(leagueId);
     const team = teams.find((entry) => String(entry.rosterId) === params.rosterId);
     return {
       title: team ? `${team.teamName} | Dynasty Fantasy HQ` : 'Team Not Found | Dynasty Fantasy HQ'
@@ -50,25 +45,12 @@ function formatTransaction(transaction: Awaited<ReturnType<typeof getLeagueTrans
 }
 
 export default async function TeamPage({ params }: { params: { rosterId: string } }) {
-  const rosterId = Number(params.rosterId);
-
-  if (!Number.isFinite(rosterId)) {
-    notFound();
-  }
-
-  let week = 1;
-  let allTeams = await getNormalizedLeagueTeams(LEAGUE_ID);
-  let team = allTeams.find((entry) => entry.rosterId === rosterId);
-  let transactions = [] as Awaited<ReturnType<typeof getLeagueTransactions>>;
-
   try {
-    const state = await getNFLState();
-    week = state.week;
-    const weekTransactions = await getLeagueTransactions(LEAGUE_ID, week);
-    transactions = weekTransactions.filter((txn) => txn.roster_ids.includes(rosterId));
-  } catch (error) {
-    if (!(error instanceof SleeperApiError)) {
-      throw error;
+    const leagueId = getLeagueId();
+    const rosterId = Number(params.rosterId);
+
+    if (!Number.isFinite(rosterId)) {
+      notFound();
     }
 
     const [allTeams, nflState] = await Promise.all([getNormalizedLeagueTeams(leagueId), getNFLState()]);
