@@ -1,4 +1,5 @@
 import {
+  FeaturedMatchup,
   LeagueTeam,
   LeagueWeeklyMatchup,
   SleeperLeague,
@@ -11,7 +12,6 @@ import {
 } from '@/types/sleeper';
 
 const DEFAULT_BASE_URL = 'https://api.sleeper.app/v1';
-export const SLEEPER_LEAGUE_ID = '1312605770595995648';
 
 export class SleeperApiError extends Error {
   constructor(
@@ -77,6 +77,15 @@ function toFantasyPoints(whole?: number, decimal?: number): number {
 function resolveTeamName(user?: SleeperUser, roster?: SleeperRoster): string {
   const metadataTeamName = user?.metadata?.team_name ?? roster?.metadata?.team_name;
   return metadataTeamName ?? user?.display_name ?? user?.username ?? `Roster ${roster?.roster_id ?? 'Unknown'}`;
+}
+
+function getWinPct(team: LeagueTeam): number {
+  const totalGames = team.wins + team.losses + team.ties;
+  if (totalGames === 0) {
+    return 0;
+  }
+
+  return (team.wins + team.ties * 0.5) / totalGames;
 }
 
 export async function getLeague(leagueId: string): Promise<SleeperLeague> {
@@ -181,7 +190,42 @@ export function buildWeeklyMatchups(matchups: SleeperMatchup[], leagueTeams: Lea
     .sort((a, b) => a.matchupId - b.matchupId);
 }
 
-export async function getNormalizedLeagueTeams(leagueId: string = SLEEPER_LEAGUE_ID): Promise<LeagueTeam[]> {
+export function selectFeaturedMatchup(matchups: LeagueWeeklyMatchup[], standings: LeagueTeam[]): FeaturedMatchup | null {
+  const rankByRoster = new Map(standings.map((team, index) => [team.rosterId, index + 1]));
+
+  let best: FeaturedMatchup | null = null;
+
+  for (const matchup of matchups) {
+    if (!matchup.isComplete || matchup.teams.length !== 2) {
+      continue;
+    }
+
+    const [teamA, teamB] = matchup.teams as [LeagueTeam, LeagueTeam];
+    const rankA = rankByRoster.get(teamA.rosterId) ?? standings.length;
+    const rankB = rankByRoster.get(teamB.rosterId) ?? standings.length;
+
+    const rankGap = Math.abs(rankA - rankB);
+    const closenessScore = Math.max(0, standings.length - rankGap) * 3;
+    const combinedPointsScore = (teamA.pointsFor + teamB.pointsFor) / 20;
+    const bothAbove500Bonus = getWinPct(teamA) > 0.5 && getWinPct(teamB) > 0.5 ? 10 : 0;
+    const score = closenessScore + combinedPointsScore + bothAbove500Bonus;
+
+    const blurb = `AI Blurb Placeholder: ${teamA.teamName} and ${teamB.teamName} are separated by ${rankGap} spot${rankGap === 1 ? '' : 's'} in the standings and combine for ${(teamA.pointsFor + teamB.pointsFor).toFixed(2)} points-for, making this one of the week's most compelling matchups.`;
+
+    if (!best || score > best.score) {
+      best = {
+        matchupId: matchup.matchupId,
+        teams: [teamA, teamB],
+        score,
+        blurb
+      };
+    }
+  }
+
+  return best;
+}
+
+export async function getNormalizedLeagueTeams(leagueId: string): Promise<LeagueTeam[]> {
   const [users, rosters] = await Promise.all([getLeagueUsers(leagueId), getLeagueRosters(leagueId)]);
   return buildLeagueTeams(users, rosters);
 }

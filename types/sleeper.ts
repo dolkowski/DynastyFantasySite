@@ -109,4 +109,11 @@ export interface LeagueWeeklyMatchup {
   isComplete: boolean;
 }
 
+export interface FeaturedMatchup {
+  matchupId: number;
+  teams: [LeagueTeam, LeagueTeam];
+  score: number;
+  blurb: string;
+}
+
 export type NormalizedLeagueTeam = LeagueTeam;
