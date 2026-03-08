@@ -1,13 +1,15 @@
 import Link from 'next/link';
-import { MatchupList } from '@/components/MatchupList';
 import { StandingsTable } from '@/components/StandingsTable';
 import {
+  buildStandings,
+  buildWeeklyMatchups,
+  getLeagueMatchups,
   getLeagueTransactions,
   getNFLState,
   getNormalizedLeagueTeams,
+  selectFeaturedMatchup,
   SLEEPER_LEAGUE_ID,
-  SleeperApiError,
-  buildStandings
+  SleeperApiError
 } from '@/lib/sleeper';
 import { getLeagueSnapshot } from '@/lib/fantasyApi';
 

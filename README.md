@@ -72,6 +72,19 @@ Available functions:
 - `buildWeeklyMatchups(matchups, leagueTeams)`
 - `getNormalizedLeagueTeams(leagueId)`
 
+
+## News Relevance System
+
+- Generic provider interface: `lib/news.ts` (`NewsProvider`)
+- Article model: `title`, `summary`, `url`, `publishedAt`, `source`, `tags`
+- Relevance scoring favors title mentions of rostered players, then summary mentions, then NFL team mentions
+- Helpers:
+  - `getTopRelevantArticlesForRoster(articles, roster, limit)`
+  - `getTopRelevantArticlesByTeam(provider, rosters, options)`
+  - `createStaticNewsProvider(articles)`
+
+The system is provider-agnostic so any NFL news API can be plugged in by implementing `NewsProvider`.
+
 ## Project Structure
 
 ```text
@@ -79,7 +92,7 @@ app/
   page.tsx
   standings/page.tsx
   matchups/page.tsx
-  teams/[teamId]/page.tsx
+  teams/[rosterId]/page.tsx
   power-rankings/page.tsx
 components/
   Header.tsx
