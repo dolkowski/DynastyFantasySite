@@ -38,38 +38,33 @@ export default async function HomePage() {
   let liveWeek = snapshot.currentWeek;
   let transactions = [] as Awaited<ReturnType<typeof getLeagueTransactions>>;
   let allTeams = [] as Awaited<ReturnType<typeof getNormalizedLeagueTeams>>;
-  let featured = null as ReturnType<typeof selectFeaturedMatchup>;
 
   try {
     const nflState = await getNFLState();
     liveWeek = nflState.week;
 
-    const [leagueTransactions, leagueTeams, weekMatchups] = await Promise.all([
+    const [leagueTransactions, leagueTeams] = await Promise.all([
       getLeagueTransactions(SLEEPER_LEAGUE_ID, nflState.week),
-      getNormalizedLeagueTeams(SLEEPER_LEAGUE_ID),
-      getLeagueMatchups(SLEEPER_LEAGUE_ID, nflState.week)
+      getNormalizedLeagueTeams(SLEEPER_LEAGUE_ID)
     ]);
 
     transactions = leagueTransactions;
     allTeams = buildStandings(leagueTeams);
-    featured = selectFeaturedMatchup(buildWeeklyMatchups(weekMatchups, leagueTeams), allTeams);
   } catch (error) {
     if (!(error instanceof SleeperApiError)) {
       throw error;
     }
   }
 
-  const fallbackFeatured = snapshot.weeklyMatchups[0];
+  const featuredMatchup = snapshot.weeklyMatchups[0];
   const topStandings = snapshot.standings.slice(0, 5);
   const latestTransactions = transactions.slice(0, 5).map(toTransactionSummary);
 
   const newsItems = [
     `${snapshot.standings[0]?.name ?? 'League leaders'} remains on top of the table at ${snapshot.standings[0]?.wins ?? 0}-${snapshot.standings[0]?.losses ?? 0}.`,
-    featured
-      ? `${featured.teams[0].teamName} and ${featured.teams[1].teamName} headline Week ${liveWeek} with elite season production.`
-      : fallbackFeatured
-        ? `Feature game this week: ${fallbackFeatured.awayTeamName} vs ${fallbackFeatured.homeTeamName} with a projected shootout.`
-        : `Matchup board is being finalized for Week ${liveWeek}.`,
+    featuredMatchup
+      ? `Feature game this week: ${featuredMatchup.awayTeamName} vs ${featuredMatchup.homeTeamName} with a projected shootout.`
+      : `Matchup board is being finalized for Week ${liveWeek}.`,
     `${latestTransactions.length} roster move${latestTransactions.length === 1 ? '' : 's'} recorded so far in Week ${liveWeek}.`
   ];
 
@@ -89,47 +84,12 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="card border-slate-700 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 p-6">
-        <p className="text-xs uppercase tracking-[0.25em] text-accent">Featured Matchup</p>
-        {featured ? (
-          <>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {featured.teams.map((team) => (
-                <article key={team.rosterId} className="rounded-xl border border-slate-700 bg-black/25 p-4">
-                  <p className="text-lg font-bold text-white">{team.teamName}</p>
-                  <p className="text-sm text-slate-300">Record: {team.wins}-{team.losses}-{team.ties}</p>
-                  <p className="text-sm text-slate-300">Points For: {team.pointsFor.toFixed(2)}</p>
-                </article>
-              ))}
-            </div>
-            <p className="mt-4 rounded-lg border border-slate-700 bg-slate-950/60 p-3 text-sm text-slate-300">{featured.blurb}</p>
-          </>
-        ) : fallbackFeatured ? (
-          <>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <article className="rounded-xl border border-slate-700 bg-black/25 p-4">
-                <p className="text-lg font-bold text-white">{fallbackFeatured.awayTeamName}</p>
-                <p className="text-sm text-slate-300">Record: See standings</p>
-                <p className="text-sm text-slate-300">Points For: {fallbackFeatured.awayProjection.toFixed(2)}</p>
-              </article>
-              <article className="rounded-xl border border-slate-700 bg-black/25 p-4">
-                <p className="text-lg font-bold text-white">{fallbackFeatured.homeTeamName}</p>
-                <p className="text-sm text-slate-300">Record: See standings</p>
-                <p className="text-sm text-slate-300">Points For: {fallbackFeatured.homeProjection.toFixed(2)}</p>
-              </article>
-            </div>
-            <p className="mt-4 rounded-lg border border-slate-700 bg-slate-950/60 p-3 text-sm text-slate-300">
-              AI Blurb Placeholder: {fallbackFeatured.awayTeamName} and {fallbackFeatured.homeTeamName} profile as a high-leverage game with major standings implications.
-            </p>
-          </>
-        ) : (
-          <p className="mt-3 text-sm text-slate-300">No matchup data available yet for Week {liveWeek}.</p>
-        )}
-      </section>
-
       <section className="grid gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2">
-          <StandingsTable standings={topStandings} title="Top 5 Standings" />
+          <MatchupList
+            title="Featured Matchup"
+            matchups={featuredMatchup ? [featuredMatchup] : snapshot.weeklyMatchups.slice(0, 1)}
+          />
         </div>
         <article className="card">
           <h3 className="text-lg font-semibold text-white">Latest News</h3>
@@ -144,6 +104,8 @@ export default async function HomePage() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
+        <StandingsTable standings={topStandings} title="Top 5 Standings" />
+
         <article className="card">
           <h3 className="text-lg font-semibold text-white">Latest Transactions</h3>
           <div className="mt-3 space-y-2">
@@ -165,27 +127,27 @@ export default async function HomePage() {
             )}
           </div>
         </article>
+      </section>
 
-        <section className="card">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Team Directory</h3>
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Quick Links</p>
-          </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {(allTeams.length > 0
-              ? allTeams.map((team) => ({ linkId: String(team.rosterId), label: team.teamName }))
-              : snapshot.standings.map((team) => ({ linkId: team.id, label: team.name }))
-            ).map((team) => (
-              <Link
-                key={team.linkId}
-                href={`/teams/${team.linkId}`}
-                className="rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-accent hover:text-white"
-              >
-                {team.label}
-              </Link>
-            ))}
-          </div>
-        </section>
+      <section className="card">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">Team Directory</h3>
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Quick Links</p>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {(allTeams.length > 0
+            ? allTeams.map((team) => ({ linkId: String(team.rosterId), label: team.teamName }))
+            : snapshot.standings.map((team) => ({ linkId: team.id, label: team.name }))
+          ).map((team) => (
+            <Link
+              key={team.linkId}
+              href={`/teams/${team.linkId}`}
+              className="rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-accent hover:text-white"
+            >
+              {team.label}
+            </Link>
+          ))}
+        </div>
       </section>
     </div>
   );
