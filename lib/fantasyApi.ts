@@ -1,6 +1,5 @@
 import { getLeagueId } from '@/lib/config';
 import {
-  buildLeagueTeams,
   buildStandings,
   buildWeeklyMatchups,
   getLeague,

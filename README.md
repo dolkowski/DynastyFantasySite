@@ -110,8 +110,6 @@ lib/
   types.ts
 types/
   sleeper.ts
-data/
-  mockLeagueData.ts
 ```
 
 ## Deployment (Vercel)

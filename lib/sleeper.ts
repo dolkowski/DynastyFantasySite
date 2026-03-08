@@ -29,6 +29,10 @@ function getBaseUrl(): string {
   return (process.env.SLEEPER_API_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/$/, '');
 }
 
+/**
+ * Shared GET helper for official Sleeper endpoints.
+ * Docs: https://docs.sleeper.com/
+ */
 async function sleeperFetch<T>(path: string): Promise<T> {
   const endpoint = `${getBaseUrl()}${path}`;
   let response: Response;
@@ -42,16 +46,19 @@ async function sleeperFetch<T>(path: string): Promise<T> {
       next: { revalidate: 60 }
     });
   } catch (error) {
+    console.warn('[sleeper] request failed: %s (%s)', path, endpoint);
     throw new SleeperApiError('Network error while contacting Sleeper API.', undefined, endpoint, error);
   }
 
   if (!response.ok) {
+    console.warn('[sleeper] non-200 response: %s status=%s', endpoint, response.status);
     throw new SleeperApiError(`Sleeper API request failed with status ${response.status}.`, response.status, endpoint);
   }
 
   try {
     return (await response.json()) as T;
   } catch (error) {
+    console.warn('[sleeper] invalid JSON payload from %s', endpoint);
     throw new SleeperApiError('Invalid JSON response from Sleeper API.', response.status, endpoint, error);
   }
 }
@@ -65,6 +72,13 @@ function assertLeagueId(leagueId: string): void {
 function assertWeek(week: number): void {
   if (!Number.isInteger(week) || week <= 0) {
     throw new SleeperApiError('Week must be a positive integer.');
+  }
+}
+
+function assertArray<T>(value: unknown, entity: string): asserts value is T[] {
+  if (!Array.isArray(value)) {
+    console.warn('[sleeper] unexpected payload for %s', entity);
+    throw new SleeperApiError(`Unexpected Sleeper payload for ${entity}.`);
   }
 }
 
@@ -88,40 +102,69 @@ function getWinPct(team: LeagueTeam): number {
   return (team.wins + team.ties * 0.5) / totalGames;
 }
 
+// GET /league/{league_id}
 export async function getLeague(leagueId: string): Promise<SleeperLeague> {
   assertLeagueId(leagueId);
-  return sleeperFetch<SleeperLeague>(`/league/${leagueId}`);
+  const league = await sleeperFetch<SleeperLeague>(`/league/${leagueId}`);
+
+  if (!league || typeof league !== 'object' || typeof league.league_id !== 'string') {
+    console.warn('[sleeper] unexpected payload for league %s', leagueId);
+    throw new SleeperApiError('Unexpected Sleeper payload for league.');
+  }
+
+  return league;
 }
 
+// GET /league/{league_id}/users
 export async function getLeagueUsers(leagueId: string): Promise<SleeperUser[]> {
   assertLeagueId(leagueId);
-  return sleeperFetch<SleeperUser[]>(`/league/${leagueId}/users`);
+  const users = await sleeperFetch<SleeperUser[]>(`/league/${leagueId}/users`);
+  assertArray<SleeperUser>(users, 'league users');
+  return users;
 }
 
+// GET /league/{league_id}/rosters
 export async function getLeagueRosters(leagueId: string): Promise<SleeperRoster[]> {
   assertLeagueId(leagueId);
-  return sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`);
+  const rosters = await sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`);
+  assertArray<SleeperRoster>(rosters, 'league rosters');
+  return rosters;
 }
 
+// GET /league/{league_id}/matchups/{week}
 export async function getLeagueMatchups(leagueId: string, week: number): Promise<SleeperMatchup[]> {
   assertLeagueId(leagueId);
   assertWeek(week);
-  return sleeperFetch<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`);
+  const matchups = await sleeperFetch<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`);
+  assertArray<SleeperMatchup>(matchups, 'league matchups');
+  return matchups;
 }
 
 export async function getLeagueTransactions(leagueId: string, week: number): Promise<SleeperTransaction[]> {
   assertLeagueId(leagueId);
   assertWeek(week);
-  return sleeperFetch<SleeperTransaction[]>(`/league/${leagueId}/transactions/${week}`);
+  const transactions = await sleeperFetch<SleeperTransaction[]>(`/league/${leagueId}/transactions/${week}`);
+  assertArray<SleeperTransaction>(transactions, 'league transactions');
+  return transactions;
 }
 
 export async function getLeagueTradedPicks(leagueId: string): Promise<SleeperTradedPick[]> {
   assertLeagueId(leagueId);
-  return sleeperFetch<SleeperTradedPick[]>(`/league/${leagueId}/traded_picks`);
+  const picks = await sleeperFetch<SleeperTradedPick[]>(`/league/${leagueId}/traded_picks`);
+  assertArray<SleeperTradedPick>(picks, 'traded picks');
+  return picks;
 }
 
+// GET /state/nfl
 export async function getNFLState(): Promise<SleeperNFLState> {
-  return sleeperFetch<SleeperNFLState>('/state/nfl');
+  const state = await sleeperFetch<SleeperNFLState>('/state/nfl');
+
+  if (!state || typeof state !== 'object' || typeof state.week !== 'number') {
+    console.warn('[sleeper] unexpected payload for nfl state');
+    throw new SleeperApiError('Unexpected Sleeper payload for NFL state.');
+  }
+
+  return state;
 }
 
 export function buildLeagueTeams(users: SleeperUser[], rosters: SleeperRoster[]): LeagueTeam[] {
