@@ -1,7 +1,6 @@
 import { mockLeagueData } from '@/data/mockLeagueData';
 import { LEAGUE_ID } from '@/lib/config';
 import {
-  buildLeagueTeams,
   buildStandings,
   buildWeeklyMatchups,
   getLeague,
@@ -12,9 +11,9 @@ import {
 } from '@/lib/sleeper';
 import { LeagueSnapshot, TeamProfile } from '@/lib/types';
 
-function mapToSnapshotFallback(): LeagueSnapshot {
-  return mockLeagueData;
-}
+export async function getLeagueSnapshot(): Promise<LeagueSnapshot> {
+  const leagueId = getLeagueId();
+  console.log('Loading Sleeper League:', leagueId);
 
 async function getSleeperSnapshot(): Promise<LeagueSnapshot> {
   console.log('Loading Sleeper League:', LEAGUE_ID);
@@ -89,14 +88,6 @@ async function getSleeperSnapshot(): Promise<LeagueSnapshot> {
       nextOpponent: 'TBD'
     }))
   };
-}
-
-export async function getLeagueSnapshot(): Promise<LeagueSnapshot> {
-  try {
-    return await getSleeperSnapshot();
-  } catch {
-    return mapToSnapshotFallback();
-  }
 }
 
 export async function getTeamById(teamId: string): Promise<TeamProfile | undefined> {

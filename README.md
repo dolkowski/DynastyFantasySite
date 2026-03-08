@@ -14,6 +14,7 @@ A production-ready Next.js App Router project for a fantasy football league webs
   - Team detail pages
   - Power rankings
 - API client layer in `lib/` with environment-variable based configuration
+- Live Sleeper league data for homepage, standings, matchups, and team pages
 - Sleeper API client with typed endpoints and normalized team helper
 - Vercel-ready deployment configuration
 
@@ -37,10 +38,10 @@ A production-ready Next.js App Router project for a fantasy football league webs
    cp .env.example .env.local
    ```
 
-3. Update `.env.local` with your provider credentials:
+3. Update `.env.local` with your league configuration:
 
-   - `FANTASY_API_BASE_URL`
-   - `FANTASY_API_KEY`
+   - `SLEEPER_LEAGUE_ID` (required on server)
+   - `NEXT_PUBLIC_SLEEPER_LEAGUE_ID` (optional client-side mirror)
    - `SLEEPER_API_BASE_URL` (optional, defaults to `https://api.sleeper.app/v1`)
    - `NEXT_PUBLIC_SITE_NAME` (optional)
 
@@ -102,13 +103,13 @@ components/
   StandingsTable.tsx
   TeamDetail.tsx
 lib/
+  config.ts
   fantasyApi.ts
   sleeper.ts
+  news.ts
   types.ts
 types/
   sleeper.ts
-data/
-  mockLeagueData.ts
 ```
 
 ## Deployment (Vercel)

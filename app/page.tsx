@@ -11,12 +11,10 @@ import {
   selectFeaturedMatchup,
   SleeperApiError
 } from '@/lib/sleeper';
-import { getLeagueSnapshot } from '@/lib/fantasyApi';
 
 function toTransactionSummary(transaction: Awaited<ReturnType<typeof getLeagueTransactions>>[number]) {
   const addCount = Object.keys(transaction.adds ?? {}).length;
   const dropCount = Object.keys(transaction.drops ?? {}).length;
-  const moveSummary = `${addCount} add${addCount === 1 ? '' : 's'} • ${dropCount} drop${dropCount === 1 ? '' : 's'}`;
 
   return {
     id: transaction.transaction_id,
@@ -28,7 +26,7 @@ function toTransactionSummary(transaction: Awaited<ReturnType<typeof getLeagueTr
       hour: 'numeric',
       minute: '2-digit'
     }),
-    moveSummary
+    moveSummary: `${addCount} add${addCount === 1 ? '' : 's'} • ${dropCount} drop${dropCount === 1 ? '' : 's'}`
   };
 }
 
@@ -41,8 +39,10 @@ export default async function HomePage() {
   let featured = null as ReturnType<typeof selectFeaturedMatchup>;
 
   try {
+    const leagueId = getLeagueId();
+    const snapshot = await getLeagueSnapshot();
     const nflState = await getNFLState();
-    liveWeek = nflState.week;
+    const liveWeek = nflState.week;
 
     const [leagueTransactions, leagueTeams, weekMatchups] = await Promise.all([
       getLeagueTransactions(LEAGUE_ID, nflState.week),
@@ -86,8 +86,7 @@ export default async function HomePage() {
             <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Current Week</p>
             <p className="mt-1 text-3xl font-extrabold text-white">{liveWeek}</p>
           </div>
-        </div>
-      </section>
+        </section>
 
       <section className="card border-slate-700 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 p-6">
         <p className="text-xs uppercase tracking-[0.25em] text-accent">Featured Matchup</p>
@@ -187,6 +186,6 @@ export default async function HomePage() {
           </div>
         </section>
       </section>
-    </div>
-  );
+    );
+  }
 }
